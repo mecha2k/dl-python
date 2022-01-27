@@ -1,31 +1,14 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# This is a companion notebook for the book [Deep Learning with Python, Second Edition](https://www.manning.com/books/deep-learning-with-python-second-edition?a_aid=keras&a_bid=76564dff). For readability, it only contains runnable code blocks and section titles, and omits everything else in the book: text paragraphs, figures, and pseudocode.
-# 
-# **If you want to be able to follow what's going on, I recommend reading the notebook side by side with your copy of the book.**
-# 
-# This notebook was generated for TensorFlow 2.6.
-
 # # Deep learning for timeseries
-
 # ## Different kinds of timeseries tasks
-
 # ## A temperature-forecasting example
 
-# In[ ]:
-
-
-get_ipython().system('wget https://s3.amazonaws.com/keras-datasets/jena_climate_2009_2016.csv.zip')
-get_ipython().system('unzip jena_climate_2009_2016.csv.zip')
+# get_ipython().system('wget https://s3.amazonaws.com/keras-datasets/jena_climate_2009_2016.csv.zip')
+# get_ipython().system('unzip jena_climate_2009_2016.csv.zip')
 
 
 # **Inspecting the data of the Jena weather dataset**
-
-# In[ ]:
-
-
 import os
+
 fname = os.path.join("jena_climate_2009_2016.csv")
 
 with open(fname) as f:
@@ -39,11 +22,8 @@ print(len(lines))
 
 
 # **Parsing the data**
-
-# In[ ]:
-
-
 import numpy as np
+
 temperature = np.zeros((len(lines),))
 raw_data = np.zeros((len(lines), len(header) - 1))
 for i, line in enumerate(lines):
@@ -53,27 +33,16 @@ for i, line in enumerate(lines):
 
 
 # **Plotting the temperature timeseries**
-
-# In[ ]:
-
-
 from matplotlib import pyplot as plt
+
 plt.plot(range(len(temperature)), temperature)
 
 
 # **Plotting the first 10 days of the temperature timeseries**
-
-# In[ ]:
-
-
 plt.plot(range(1440), temperature[:1440])
 
 
 # **Computing the number of samples we'll use for each data split**
-
-# In[ ]:
-
-
 num_train_samples = int(0.5 * len(raw_data))
 num_val_samples = int(0.25 * len(raw_data))
 num_test_samples = len(raw_data) - num_train_samples - num_val_samples
@@ -83,23 +52,16 @@ print("num_test_samples:", num_test_samples)
 
 
 # ### Preparing the data
-
 # **Normalizing the data**
-
-# In[ ]:
-
-
 mean = raw_data[:num_train_samples].mean(axis=0)
 raw_data -= mean
 std = raw_data[:num_train_samples].std(axis=0)
 raw_data /= std
 
 
-# In[ ]:
-
-
 import numpy as np
 from tensorflow import keras
+
 int_sequence = np.arange(10)
 dummy_dataset = keras.utils.timeseries_dataset_from_array(
     data=int_sequence[:-3],
@@ -114,10 +76,6 @@ for inputs, targets in dummy_dataset:
 
 
 # **Instantiating datasets for training, validation, and testing**
-
-# In[ ]:
-
-
 sampling_rate = 6
 sequence_length = 120
 delay = sampling_rate * (sequence_length + 24 - 1)
@@ -131,7 +89,8 @@ train_dataset = keras.utils.timeseries_dataset_from_array(
     shuffle=True,
     batch_size=batch_size,
     start_index=0,
-    end_index=num_train_samples)
+    end_index=num_train_samples,
+)
 
 val_dataset = keras.utils.timeseries_dataset_from_array(
     raw_data[:-delay],
@@ -141,7 +100,8 @@ val_dataset = keras.utils.timeseries_dataset_from_array(
     shuffle=True,
     batch_size=batch_size,
     start_index=num_train_samples,
-    end_index=num_train_samples + num_val_samples)
+    end_index=num_train_samples + num_val_samples,
+)
 
 test_dataset = keras.utils.timeseries_dataset_from_array(
     raw_data[:-delay],
@@ -150,14 +110,11 @@ test_dataset = keras.utils.timeseries_dataset_from_array(
     sequence_length=sequence_length,
     shuffle=True,
     batch_size=batch_size,
-    start_index=num_train_samples + num_val_samples)
+    start_index=num_train_samples + num_val_samples,
+)
 
 
 # **Inspecting the output of one of our datasets**
-
-# In[ ]:
-
-
 for samples, targets in train_dataset:
     print("samples shape:", samples.shape)
     print("targets shape:", targets.shape)
@@ -165,14 +122,11 @@ for samples, targets in train_dataset:
 
 
 # ### A common-sense, non-machine-learning baseline
-
 # **Computing the common-sense baseline MAE**
-
-# In[ ]:
 
 
 def evaluate_naive_method(dataset):
-    total_abs_err = 0.
+    total_abs_err = 0.0
     samples_seen = 0
     for samples, targets in dataset:
         preds = samples[:, -1, 1] * std[1] + mean[1]
@@ -180,16 +134,13 @@ def evaluate_naive_method(dataset):
         samples_seen += samples.shape[0]
     return total_abs_err / samples_seen
 
+
 print(f"Validation MAE: {evaluate_naive_method(val_dataset):.2f}")
 print(f"Test MAE: {evaluate_naive_method(test_dataset):.2f}")
 
 
 # ### Let's try a basic machine-learning model
-
 # **Training and evaluating a densely connected model**
-
-# In[ ]:
-
 
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -200,26 +151,17 @@ x = layers.Dense(16, activation="relu")(x)
 outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("jena_dense.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("jena_dense.keras", save_best_only=True)]
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=10,
-                    validation_data=val_dataset,
-                    callbacks=callbacks)
+history = model.fit(train_dataset, epochs=10, validation_data=val_dataset, callbacks=callbacks)
 
 model = keras.models.load_model("jena_dense.keras")
 print(f"Test MAE: {model.evaluate(test_dataset)[1]:.2f}")
 
 
 # **Plotting results**
-
-# In[ ]:
-
-
 import matplotlib.pyplot as plt
+
 loss = history.history["mae"]
 val_loss = history.history["val_mae"]
 epochs = range(1, len(loss) + 1)
@@ -232,10 +174,6 @@ plt.show()
 
 
 # ### Let's try a 1D convolutional model
-
-# In[ ]:
-
-
 inputs = keras.Input(shape=(sequence_length, raw_data.shape[-1]))
 x = layers.Conv1D(8, 24, activation="relu")(inputs)
 x = layers.MaxPooling1D(2)(x)
@@ -246,54 +184,33 @@ x = layers.GlobalAveragePooling1D()(x)
 outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("jena_conv.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("jena_conv.keras", save_best_only=True)]
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=10,
-                    validation_data=val_dataset,
-                    callbacks=callbacks)
+history = model.fit(train_dataset, epochs=10, validation_data=val_dataset, callbacks=callbacks)
 
 model = keras.models.load_model("jena_conv.keras")
 print(f"Test MAE: {model.evaluate(test_dataset)[1]:.2f}")
 
 
 # ### A first recurrent baseline
-
 # **A simple LSTM-based model**
-
-# In[ ]:
-
-
 inputs = keras.Input(shape=(sequence_length, raw_data.shape[-1]))
 x = layers.LSTM(16)(inputs)
 outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("jena_lstm.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("jena_lstm.keras", save_best_only=True)]
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=10,
-                    validation_data=val_dataset,
-                    callbacks=callbacks)
+history = model.fit(train_dataset, epochs=10, validation_data=val_dataset, callbacks=callbacks)
 
 model = keras.models.load_model("jena_lstm.keras")
 print(f"Test MAE: {model.evaluate(test_dataset)[1]:.2f}")
 
 
 # ## Understanding recurrent neural networks
-
 # **NumPy implementation of a simple RNN**
-
-# In[ ]:
-
-
 import numpy as np
+
 timesteps = 100
 input_features = 32
 output_features = 64
@@ -311,22 +228,13 @@ final_output_sequence = np.stack(successive_outputs, axis=0)
 
 
 # ### A recurrent layer in Keras
-
 # **An RNN layer that can process sequences of any length**
-
-# In[ ]:
-
-
 num_features = 14
 inputs = keras.Input(shape=(None, num_features))
 outputs = layers.SimpleRNN(16)(inputs)
 
 
 # **An RNN layer that returns only its last output step**
-
-# In[ ]:
-
-
 num_features = 14
 steps = 120
 inputs = keras.Input(shape=(steps, num_features))
@@ -335,10 +243,6 @@ print(outputs.shape)
 
 
 # **An RNN layer that returns its full output sequence**
-
-# In[ ]:
-
-
 num_features = 14
 steps = 120
 inputs = keras.Input(shape=(steps, num_features))
@@ -347,10 +251,6 @@ print(outputs.shape)
 
 
 # **Stacking RNN layers**
-
-# In[ ]:
-
-
 inputs = keras.Input(shape=(steps, num_features))
 x = layers.SimpleRNN(16, return_sequences=True)(inputs)
 x = layers.SimpleRNN(16, return_sequences=True)(x)
@@ -358,32 +258,17 @@ outputs = layers.SimpleRNN(16)(x)
 
 
 # ## Advanced use of recurrent neural networks
-
 # ### Using recurrent dropout to fight overfitting
-
 # **Training and evaluating a dropout-regularized LSTM**
-
-# In[ ]:
-
-
 inputs = keras.Input(shape=(sequence_length, raw_data.shape[-1]))
 x = layers.LSTM(32, recurrent_dropout=0.25)(inputs)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("jena_lstm_dropout.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("jena_lstm_dropout.keras", save_best_only=True)]
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=50,
-                    validation_data=val_dataset,
-                    callbacks=callbacks)
-
-
-# In[ ]:
+history = model.fit(train_dataset, epochs=50, validation_data=val_dataset, callbacks=callbacks)
 
 
 inputs = keras.Input(shape=(sequence_length, num_features))
@@ -391,11 +276,7 @@ x = layers.LSTM(32, recurrent_dropout=0.2, unroll=True)(inputs)
 
 
 # ### Stacking recurrent layers
-
 # **Training and evaluating a dropout-regularized, stacked GRU model**
-
-# In[ ]:
-
 
 inputs = keras.Input(shape=(sequence_length, raw_data.shape[-1]))
 x = layers.GRU(32, recurrent_dropout=0.5, return_sequences=True)(inputs)
@@ -404,25 +285,15 @@ x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("jena_stacked_gru_dropout.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("jena_stacked_gru_dropout.keras", save_best_only=True)]
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=50,
-                    validation_data=val_dataset,
-                    callbacks=callbacks)
+history = model.fit(train_dataset, epochs=50, validation_data=val_dataset, callbacks=callbacks)
 model = keras.models.load_model("jena_stacked_gru_dropout.keras")
 print(f"Test MAE: {model.evaluate(test_dataset)[1]:.2f}")
 
 
 # ### Using bidirectional RNNs
-
 # **Training and evaluating a bidirectional LSTM**
-
-# In[ ]:
-
 
 inputs = keras.Input(shape=(sequence_length, raw_data.shape[-1]))
 x = layers.Bidirectional(layers.LSTM(16))(inputs)
@@ -430,11 +301,4 @@ outputs = layers.Dense(1)(x)
 model = keras.Model(inputs, outputs)
 
 model.compile(optimizer="rmsprop", loss="mse", metrics=["mae"])
-history = model.fit(train_dataset,
-                    epochs=10,
-                    validation_data=val_dataset)
-
-
-# ### Going even further
-
-# ## Summary
+history = model.fit(train_dataset, epochs=10, validation_data=val_dataset)
