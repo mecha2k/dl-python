@@ -1,41 +1,14 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# This is a companion notebook for the book [Deep Learning with Python, Second Edition](https://www.manning.com/books/deep-learning-with-python-second-edition?a_aid=keras&a_bid=76564dff). For readability, it only contains runnable code blocks and section titles, and omits everything else in the book: text paragraphs, figures, and pseudocode.
-# 
-# **If you want to be able to follow what's going on, I recommend reading the notebook side by side with your copy of the book.**
-# 
-# This notebook was generated for TensorFlow 2.6.
-
-# ## The Transformer architecture
-
-# ### Understanding self-attention
-
-# #### Generalized self-attention: the query-key-value model
-
-# ### Multi-head attention
-
-# ### The Transformer encoder
-
-# **Getting the data**
-
-# In[ ]:
-
-
-get_ipython().system('curl -O https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
-get_ipython().system('tar -xf aclImdb_v1.tar.gz')
-get_ipython().system('rm -r aclImdb/train/unsup')
-
-
-# **Preparing the data**
-
-# In[ ]:
-
+## The Transformer architecture
+### Understanding self-attention
+#### Generalized self-attention: the query-key-value model
+### Multi-head attention
+### The Transformer encoder
 
 import os, pathlib, shutil, random
 from tensorflow import keras
+
 batch_size = 32
-base_dir = pathlib.Path("aclImdb")
+base_dir = pathlib.Path("data/aclImdb")
 val_dir = base_dir / "val"
 train_dir = base_dir / "train"
 for category in ("neg", "pos"):
@@ -45,26 +18,15 @@ for category in ("neg", "pos"):
     num_val_samples = int(0.2 * len(files))
     val_files = files[-num_val_samples:]
     for fname in val_files:
-        shutil.move(train_dir / category / fname,
-                    val_dir / category / fname)
+        shutil.move(train_dir / category / fname, val_dir / category / fname)
 
-train_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/train", batch_size=batch_size
-)
-val_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/val", batch_size=batch_size
-)
-test_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/test", batch_size=batch_size
-)
+train_ds = keras.utils.text_dataset_from_directory("aclImdb/train", batch_size=batch_size)
+val_ds = keras.utils.text_dataset_from_directory("aclImdb/val", batch_size=batch_size)
+test_ds = keras.utils.text_dataset_from_directory("aclImdb/test", batch_size=batch_size)
 text_only_train_ds = train_ds.map(lambda x, y: x)
 
 
 # **Vectorizing the data**
-
-# In[ ]:
-
-
 from tensorflow.keras import layers
 
 max_length = 600
@@ -76,25 +38,16 @@ text_vectorization = layers.TextVectorization(
 )
 text_vectorization.adapt(text_only_train_ds)
 
-int_train_ds = train_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
-int_val_ds = val_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
-int_test_ds = test_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
+int_train_ds = train_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
+int_val_ds = val_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
+int_test_ds = test_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
 
 
 # **Transformer encoder implemented as a subclassed `Layer`**
-
-# In[ ]:
-
-
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+
 
 class TransformerEncoder(layers.Layer):
     def __init__(self, embed_dim, dense_dim, num_heads, **kwargs):
@@ -102,11 +55,12 @@ class TransformerEncoder(layers.Layer):
         self.embed_dim = embed_dim
         self.dense_dim = dense_dim
         self.num_heads = num_heads
-        self.attention = layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=embed_dim)
+        self.attention = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.dense_proj = keras.Sequential(
-            [layers.Dense(dense_dim, activation="relu"),
-             layers.Dense(embed_dim),]
+            [
+                layers.Dense(dense_dim, activation="relu"),
+                layers.Dense(embed_dim),
+            ]
         )
         self.layernorm_1 = layers.LayerNormalization()
         self.layernorm_2 = layers.LayerNormalization()
@@ -114,25 +68,24 @@ class TransformerEncoder(layers.Layer):
     def call(self, inputs, mask=None):
         if mask is not None:
             mask = mask[:, tf.newaxis, :]
-        attention_output = self.attention(
-            inputs, inputs, attention_mask=mask)
+        attention_output = self.attention(inputs, inputs, attention_mask=mask)
         proj_input = self.layernorm_1(inputs + attention_output)
         proj_output = self.dense_proj(proj_input)
         return self.layernorm_2(proj_input + proj_output)
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            "embed_dim": self.embed_dim,
-            "num_heads": self.num_heads,
-            "dense_dim": self.dense_dim,
-        })
+        config.update(
+            {
+                "embed_dim": self.embed_dim,
+                "num_heads": self.num_heads,
+                "dense_dim": self.dense_dim,
+            }
+        )
         return config
 
 
 # **Using the Transformer encoder for text classification**
-
-# In[ ]:
 
 
 vocab_size = 20000
@@ -147,42 +100,28 @@ x = layers.GlobalMaxPooling1D()(x)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
 
 # **Training and evaluating the Transformer encoder based model**
-
-# In[ ]:
-
-
-callbacks = [
-    keras.callbacks.ModelCheckpoint("transformer_encoder.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("transformer_encoder.keras", save_best_only=True)]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=20, callbacks=callbacks)
 model = keras.models.load_model(
-    "transformer_encoder.keras",
-    custom_objects={"TransformerEncoder": TransformerEncoder})
+    "transformer_encoder.keras", custom_objects={"TransformerEncoder": TransformerEncoder}
+)
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 
 # #### Using positional encoding to re-inject order information
-
 # **Implementing positional embedding as a subclassed layer**
-
-# In[ ]:
-
-
 class PositionalEmbedding(layers.Layer):
     def __init__(self, sequence_length, input_dim, output_dim, **kwargs):
         super().__init__(**kwargs)
-        self.token_embeddings = layers.Embedding(
-            input_dim=input_dim, output_dim=output_dim)
+        self.token_embeddings = layers.Embedding(input_dim=input_dim, output_dim=output_dim)
         self.position_embeddings = layers.Embedding(
-            input_dim=sequence_length, output_dim=output_dim)
+            input_dim=sequence_length, output_dim=output_dim
+        )
         self.sequence_length = sequence_length
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -199,21 +138,18 @@ class PositionalEmbedding(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            "output_dim": self.output_dim,
-            "sequence_length": self.sequence_length,
-            "input_dim": self.input_dim,
-        })
+        config.update(
+            {
+                "output_dim": self.output_dim,
+                "sequence_length": self.sequence_length,
+                "input_dim": self.input_dim,
+            }
+        )
         return config
 
 
 # #### Putting it all together: A text-classification Transformer
-
 # **Combining the Transformer encoder with positional embedding**
-
-# In[ ]:
-
-
 vocab_size = 20000
 sequence_length = 600
 embed_dim = 256
@@ -227,20 +163,18 @@ x = layers.GlobalMaxPooling1D()(x)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("full_transformer_encoder.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("full_transformer_encoder.keras", save_best_only=True)]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=20, callbacks=callbacks)
 model = keras.models.load_model(
     "full_transformer_encoder.keras",
-    custom_objects={"TransformerEncoder": TransformerEncoder,
-                    "PositionalEmbedding": PositionalEmbedding})
+    custom_objects={
+        "TransformerEncoder": TransformerEncoder,
+        "PositionalEmbedding": PositionalEmbedding,
+    },
+)
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 

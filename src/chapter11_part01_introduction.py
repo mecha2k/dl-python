@@ -127,7 +127,7 @@ print(decoded_sentence)
 
 import os, pathlib, shutil, random
 
-base_dir = pathlib.Path("aclImdb")
+base_dir = pathlib.Path("data/aclImdb")
 val_dir = base_dir / "val"
 train_dir = base_dir / "train"
 for category in ("neg", "pos"):

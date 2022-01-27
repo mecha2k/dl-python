@@ -1,28 +1,14 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# This is a companion notebook for the book [Deep Learning with Python, Second Edition](https://www.manning.com/books/deep-learning-with-python-second-edition?a_aid=keras&a_bid=76564dff). For readability, it only contains runnable code blocks and section titles, and omits everything else in the book: text paragraphs, figures, and pseudocode.
-# 
-# **If you want to be able to follow what's going on, I recommend reading the notebook side by side with your copy of the book.**
-# 
-# This notebook was generated for TensorFlow 2.6.
-
-# # Generative deep learning
-
-# ## Text generation
-
-# ### A brief history of generative deep learning for sequence generation
-
-# ### How do you generate sequence data?
-
-# ### The importance of the sampling strategy
+# Generative deep learning
+## Text generation
+### A brief history of generative deep learning for sequence generation
+### How do you generate sequence data?
+### The importance of the sampling strategy
 
 # **Reweighting a probability distribution to a different temperature**
 
-# In[ ]:
-
-
 import numpy as np
+
+
 def reweight_distribution(original_distribution, temperature=0.5):
     distribution = np.log(original_distribution) / temperature
     distribution = np.exp(distribution)
@@ -30,35 +16,24 @@ def reweight_distribution(original_distribution, temperature=0.5):
 
 
 # ### Implementing text generation with Keras
-
 # #### Preparing the data
-
 # **Downloading and uncompressing the IMDB movie reviews dataset**
 
-# In[ ]:
-
-
-get_ipython().system('wget https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
-get_ipython().system('tar -xf aclImdb_v1.tar.gz')
+# get_ipython().system('wget https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
+# get_ipython().system('tar -xf aclImdb_v1.tar.gz')
 
 
 # **Creating a dataset from text files (one file = one sample)**
-
-# In[ ]:
-
-
 import tensorflow as tf
 from tensorflow import keras
+
 dataset = keras.utils.text_dataset_from_directory(
-    directory="aclImdb", label_mode=None, batch_size=256)
+    directory="aclImdb", label_mode=None, batch_size=256
+)
 dataset = dataset.map(lambda x: tf.strings.regex_replace(x, "<br />", " "))
 
 
 # **Preparing a `TextVectorization` layer**
-
-# In[ ]:
-
-
 from tensorflow.keras.layers import TextVectorization
 
 sequence_length = 100
@@ -72,34 +47,28 @@ text_vectorization.adapt(dataset)
 
 
 # **Setting up a language modeling dataset**
-
-# In[ ]:
-
-
 def prepare_lm_dataset(text_batch):
     vectorized_sequences = text_vectorization(text_batch)
     x = vectorized_sequences[:, :-1]
     y = vectorized_sequences[:, 1:]
     return x, y
 
+
 lm_dataset = dataset.map(prepare_lm_dataset, num_parallel_calls=4)
 
 
 # #### A Transformer-based sequence-to-sequence model
-
-# In[ ]:
-
-
 import tensorflow as tf
 from tensorflow.keras import layers
+
 
 class PositionalEmbedding(layers.Layer):
     def __init__(self, sequence_length, input_dim, output_dim, **kwargs):
         super().__init__(**kwargs)
-        self.token_embeddings = layers.Embedding(
-            input_dim=input_dim, output_dim=output_dim)
+        self.token_embeddings = layers.Embedding(input_dim=input_dim, output_dim=output_dim)
         self.position_embeddings = layers.Embedding(
-            input_dim=sequence_length, output_dim=output_dim)
+            input_dim=sequence_length, output_dim=output_dim
+        )
         self.sequence_length = sequence_length
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -116,11 +85,13 @@ class PositionalEmbedding(layers.Layer):
 
     def get_config(self):
         config = super(PositionalEmbedding, self).get_config()
-        config.update({
-            "output_dim": self.output_dim,
-            "sequence_length": self.sequence_length,
-            "input_dim": self.input_dim,
-        })
+        config.update(
+            {
+                "output_dim": self.output_dim,
+                "sequence_length": self.sequence_length,
+                "input_dim": self.input_dim,
+            }
+        )
         return config
 
 
@@ -130,13 +101,13 @@ class TransformerDecoder(layers.Layer):
         self.embed_dim = embed_dim
         self.dense_dim = dense_dim
         self.num_heads = num_heads
-        self.attention_1 = layers.MultiHeadAttention(
-          num_heads=num_heads, key_dim=embed_dim)
-        self.attention_2 = layers.MultiHeadAttention(
-          num_heads=num_heads, key_dim=embed_dim)
+        self.attention_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.attention_2 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.dense_proj = keras.Sequential(
-            [layers.Dense(dense_dim, activation="relu"),
-             layers.Dense(embed_dim),]
+            [
+                layers.Dense(dense_dim, activation="relu"),
+                layers.Dense(embed_dim),
+            ]
         )
         self.layernorm_1 = layers.LayerNormalization()
         self.layernorm_2 = layers.LayerNormalization()
@@ -145,14 +116,17 @@ class TransformerDecoder(layers.Layer):
 
     def get_config(self):
         config = super(TransformerDecoder, self).get_config()
-        config.update({
-            "embed_dim": self.embed_dim,
-            "num_heads": self.num_heads,
-            "dense_dim": self.dense_dim,
-        })
+        config.update(
+            {
+                "embed_dim": self.embed_dim,
+                "num_heads": self.num_heads,
+                "dense_dim": self.dense_dim,
+            }
+        )
         return config
 
-    def get_causal_attention_mask(self, inputs):
+    @staticmethod
+    def get_causal_attention_mask(inputs):
         input_shape = tf.shape(inputs)
         batch_size, sequence_length = input_shape[0], input_shape[1]
         i = tf.range(sequence_length)[:, tf.newaxis]
@@ -160,21 +134,18 @@ class TransformerDecoder(layers.Layer):
         mask = tf.cast(i >= j, dtype="int32")
         mask = tf.reshape(mask, (1, input_shape[1], input_shape[1]))
         mult = tf.concat(
-            [tf.expand_dims(batch_size, -1),
-             tf.constant([1, 1], dtype=tf.int32)], axis=0)
+            [tf.expand_dims(batch_size, -1), tf.constant([1, 1], dtype=tf.int32)], axis=0
+        )
         return tf.tile(mask, mult)
 
     def call(self, inputs, encoder_outputs, mask=None):
         causal_mask = self.get_causal_attention_mask(inputs)
         if mask is not None:
-            padding_mask = tf.cast(
-                mask[:, tf.newaxis, :], dtype="int32")
+            padding_mask = tf.cast(mask[:, tf.newaxis, :], dtype="int32")
             padding_mask = tf.minimum(padding_mask, causal_mask)
         attention_output_1 = self.attention_1(
-            query=inputs,
-            value=inputs,
-            key=inputs,
-            attention_mask=causal_mask)
+            query=inputs, value=inputs, key=inputs, attention_mask=causal_mask
+        )
         attention_output_1 = self.layernorm_1(inputs + attention_output_1)
         attention_output_2 = self.attention_2(
             query=attention_output_1,
@@ -182,18 +153,14 @@ class TransformerDecoder(layers.Layer):
             key=encoder_outputs,
             attention_mask=padding_mask,
         )
-        attention_output_2 = self.layernorm_2(
-            attention_output_1 + attention_output_2)
+        attention_output_2 = self.layernorm_2(attention_output_1 + attention_output_2)
         proj_output = self.dense_proj(attention_output_2)
         return self.layernorm_3(attention_output_2 + proj_output)
 
 
 # **A simple Transformer-based language model**
-
-# In[ ]:
-
-
 from tensorflow.keras import layers
+
 embed_dim = 256
 latent_dim = 2048
 num_heads = 2
@@ -207,15 +174,11 @@ model.compile(loss="sparse_categorical_crossentropy", optimizer="rmsprop")
 
 
 # ### A text-generation callback with variable-temperature sampling
-
 # **The text-generation callback**
-
-# In[ ]:
-
-
 import numpy as np
 
 tokens_index = dict(enumerate(text_vectorization.get_vocabulary()))
+
 
 def sample_next(predictions, temperature=1.0):
     predictions = np.asarray(predictions).astype("float64")
@@ -225,13 +188,11 @@ def sample_next(predictions, temperature=1.0):
     probas = np.random.multinomial(1, predictions, 1)
     return np.argmax(probas)
 
+
 class TextGenerator(keras.callbacks.Callback):
-    def __init__(self,
-                 prompt,
-                 generate_length,
-                 model_input_length,
-                 temperatures=(1.,),
-                 print_freq=1):
+    def __init__(
+        self, prompt, generate_length, model_input_length, temperatures=(1.0,), print_freq=1
+    ):
         self.prompt = prompt
         self.generate_length = generate_length
         self.model_input_length = model_input_length
@@ -252,19 +213,17 @@ class TextGenerator(keras.callbacks.Callback):
                 sentence += " " + sampled_token
             print(sentence)
 
+
 prompt = "This movie"
 text_gen_callback = TextGenerator(
     prompt,
     generate_length=50,
     model_input_length=sequence_length,
-    temperatures=(0.2, 0.5, 0.7, 1., 1.5))
+    temperatures=(0.2, 0.5, 0.7, 1.0, 1.5),
+)
 
 
 # **Fitting the language model**
-
-# In[ ]:
-
-
 model.fit(lm_dataset, epochs=200, callbacks=[text_gen_callback])
 
 

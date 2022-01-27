@@ -1,33 +1,14 @@
-#!/usr/bin/env python
-# coding: utf-8
+### Processing words as a sequence: The sequence model approach
+#### A first practical example
 
-# This is a companion notebook for the book [Deep Learning with Python, Second Edition](https://www.manning.com/books/deep-learning-with-python-second-edition?a_aid=keras&a_bid=76564dff). For readability, it only contains runnable code blocks and section titles, and omits everything else in the book: text paragraphs, figures, and pseudocode.
-# 
-# **If you want to be able to follow what's going on, I recommend reading the notebook side by side with your copy of the book.**
-# 
-# This notebook was generated for TensorFlow 2.6.
-
-# ### Processing words as a sequence: The sequence model approach
-
-# #### A first practical example
-
-# **Downloading the data**
-
-# In[ ]:
-
-
-get_ipython().system('curl -O https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
-get_ipython().system('tar -xf aclImdb_v1.tar.gz')
-get_ipython().system('rm -r aclImdb/train/unsup')
-
-
-# **Preparing the data**
-
-# In[ ]:
+# get_ipython().system('curl -O https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
+# get_ipython().system('tar -xf aclImdb_v1.tar.gz')
+# get_ipython().system('rm -r aclImdb/train/unsup')
 
 
 import os, pathlib, shutil, random
 from tensorflow import keras
+
 batch_size = 32
 base_dir = pathlib.Path("aclImdb")
 val_dir = base_dir / "val"
@@ -39,24 +20,15 @@ for category in ("neg", "pos"):
     num_val_samples = int(0.2 * len(files))
     val_files = files[-num_val_samples:]
     for fname in val_files:
-        shutil.move(train_dir / category / fname,
-                    val_dir / category / fname)
+        shutil.move(train_dir / category / fname, val_dir / category / fname)
 
-train_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/train", batch_size=batch_size
-)
-val_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/val", batch_size=batch_size
-)
-test_ds = keras.utils.text_dataset_from_directory(
-    "aclImdb/test", batch_size=batch_size
-)
+train_ds = keras.utils.text_dataset_from_directory("aclImdb/train", batch_size=batch_size)
+val_ds = keras.utils.text_dataset_from_directory("aclImdb/val", batch_size=batch_size)
+test_ds = keras.utils.text_dataset_from_directory("aclImdb/test", batch_size=batch_size)
 text_only_train_ds = train_ds.map(lambda x, y: x)
 
 
 # **Preparing integer sequence datasets**
-
-# In[ ]:
 
 
 from tensorflow.keras import layers
@@ -70,44 +42,30 @@ text_vectorization = layers.TextVectorization(
 )
 text_vectorization.adapt(text_only_train_ds)
 
-int_train_ds = train_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
-int_val_ds = val_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
-int_test_ds = test_ds.map(
-    lambda x, y: (text_vectorization(x), y),
-    num_parallel_calls=4)
+int_train_ds = train_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
+int_val_ds = val_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
+int_test_ds = test_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_calls=4)
 
 
 # **A sequence model built on one-hot encoded vector sequences**
 
-# In[ ]:
-
 
 import tensorflow as tf
+
 inputs = keras.Input(shape=(None,), dtype="int64")
 embedded = tf.one_hot(inputs, depth=max_tokens)
 x = layers.Bidirectional(layers.LSTM(32))(embedded)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
 
 # **Training a first basic sequence model**
 
-# In[ ]:
 
-
-callbacks = [
-    keras.callbacks.ModelCheckpoint("one_hot_bidir_lstm.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("one_hot_bidir_lstm.keras", save_best_only=True)]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=10, callbacks=callbacks)
 model = keras.models.load_model("one_hot_bidir_lstm.keras")
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
@@ -119,15 +77,11 @@ print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 # **Instantiating an `Embedding` layer**
 
-# In[ ]:
-
 
 embedding_layer = layers.Embedding(input_dim=max_tokens, output_dim=256)
 
 
 # **Model that uses an `Embedding` layer trained from scratch**
-
-# In[ ]:
 
 
 inputs = keras.Input(shape=(None,), dtype="int64")
@@ -136,15 +90,10 @@ x = layers.Bidirectional(layers.LSTM(32))(embedded)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
-callbacks = [
-    keras.callbacks.ModelCheckpoint("embeddings_bidir_gru.keras",
-                                    save_best_only=True)
-]
+callbacks = [keras.callbacks.ModelCheckpoint("embeddings_bidir_gru.keras", save_best_only=True)]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=10, callbacks=callbacks)
 model = keras.models.load_model("embeddings_bidir_gru.keras")
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
@@ -154,45 +103,32 @@ print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 # **Using an `Embedding` layer with masking enabled**
 
-# In[ ]:
-
 
 inputs = keras.Input(shape=(None,), dtype="int64")
-embedded = layers.Embedding(
-    input_dim=max_tokens, output_dim=256, mask_zero=True)(inputs)
+embedded = layers.Embedding(input_dim=max_tokens, output_dim=256, mask_zero=True)(inputs)
 x = layers.Bidirectional(layers.LSTM(32))(embedded)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
 callbacks = [
-    keras.callbacks.ModelCheckpoint("embeddings_bidir_gru_with_masking.keras",
-                                    save_best_only=True)
+    keras.callbacks.ModelCheckpoint("embeddings_bidir_gru_with_masking.keras", save_best_only=True)
 ]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=10, callbacks=callbacks)
 model = keras.models.load_model("embeddings_bidir_gru_with_masking.keras")
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 
-# #### Using pretrained word embeddings
-
-# In[ ]:
-
-
-get_ipython().system('wget http://nlp.stanford.edu/data/glove.6B.zip')
-get_ipython().system('unzip -q glove.6B.zip')
+#### Using pretrained word embeddings
+# get_ipython().system('wget https://nlp.stanford.edu/data/glove.6B.zip')
+# get_ipython().system('unzip -q glove.6B.zip')
 
 
 # **Parsing the GloVe word-embeddings file**
-
-# In[ ]:
-
-
 import numpy as np
+
 path_to_glove_file = "glove.6B.100d.txt"
 
 embeddings_index = {}
@@ -206,10 +142,6 @@ print(f"Found {len(embeddings_index)} word vectors.")
 
 
 # **Preparing the GloVe word-embeddings matrix**
-
-# In[ ]:
-
-
 embedding_dim = 100
 
 vocabulary = text_vectorization.get_vocabulary()
@@ -217,14 +149,11 @@ word_index = dict(zip(vocabulary, range(len(vocabulary))))
 
 embedding_matrix = np.zeros((max_tokens, embedding_dim))
 for word, i in word_index.items():
+    embedding_vector = None
     if i < max_tokens:
         embedding_vector = embeddings_index.get(word)
     if embedding_vector is not None:
         embedding_matrix[i] = embedding_vector
-
-
-# In[ ]:
-
 
 embedding_layer = layers.Embedding(
     max_tokens,
@@ -236,26 +165,18 @@ embedding_layer = layers.Embedding(
 
 
 # **Model that uses a pretrained Embedding layer**
-
-# In[ ]:
-
-
 inputs = keras.Input(shape=(None,), dtype="int64")
 embedded = embedding_layer(inputs)
 x = layers.Bidirectional(layers.LSTM(32))(embedded)
 x = layers.Dropout(0.5)(x)
 outputs = layers.Dense(1, activation="sigmoid")(x)
 model = keras.Model(inputs, outputs)
-model.compile(optimizer="rmsprop",
-              loss="binary_crossentropy",
-              metrics=["accuracy"])
+model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
 model.summary()
 
 callbacks = [
-    keras.callbacks.ModelCheckpoint("glove_embeddings_sequence_model.keras",
-                                    save_best_only=True)
+    keras.callbacks.ModelCheckpoint("glove_embeddings_sequence_model.keras", save_best_only=True)
 ]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=10, callbacks=callbacks)
 model = keras.models.load_model("glove_embeddings_sequence_model.keras")
 print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
-

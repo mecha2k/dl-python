@@ -1,25 +1,8 @@
-#!/usr/bin/env python
-# coding: utf-8
+## Beyond text classification: Sequence-to-sequence learning
+### A machine translation example
 
-# This is a companion notebook for the book [Deep Learning with Python, Second Edition](https://www.manning.com/books/deep-learning-with-python-second-edition?a_aid=keras&a_bid=76564dff). For readability, it only contains runnable code blocks and section titles, and omits everything else in the book: text paragraphs, figures, and pseudocode.
-# 
-# **If you want to be able to follow what's going on, I recommend reading the notebook side by side with your copy of the book.**
-# 
-# This notebook was generated for TensorFlow 2.6.
-
-# ## Beyond text classification: Sequence-to-sequence learning
-
-# ### A machine translation example
-
-# In[ ]:
-
-
-get_ipython().system('wget http://storage.googleapis.com/download.tensorflow.org/data/spa-eng.zip')
-get_ipython().system('unzip -q spa-eng.zip')
-
-
-# In[ ]:
-
+# get_ipython().system('wget http://storage.googleapis.com/download.tensorflow.org/data/spa-eng.zip')
+# get_ipython().system('unzip -q spa-eng.zip')
 
 text_file = "spa-eng/spa.txt"
 with open(text_file) as f:
@@ -31,30 +14,19 @@ for line in lines:
     text_pairs.append((english, spanish))
 
 
-# In[ ]:
-
-
 import random
+
 print(random.choice(text_pairs))
 
-
-# In[ ]:
-
-
-import random
 random.shuffle(text_pairs)
 num_val_samples = int(0.15 * len(text_pairs))
 num_train_samples = len(text_pairs) - 2 * num_val_samples
 train_pairs = text_pairs[:num_train_samples]
-val_pairs = text_pairs[num_train_samples:num_train_samples + num_val_samples]
-test_pairs = text_pairs[num_train_samples + num_val_samples:]
+val_pairs = text_pairs[num_train_samples : num_train_samples + num_val_samples]
+test_pairs = text_pairs[num_train_samples + num_val_samples :]
 
 
 # **Vectorizing the English and Spanish text pairs**
-
-# In[ ]:
-
-
 import tensorflow as tf
 import string
 import re
@@ -63,10 +35,11 @@ strip_chars = string.punctuation + "¿"
 strip_chars = strip_chars.replace("[", "")
 strip_chars = strip_chars.replace("]", "")
 
+
 def custom_standardization(input_string):
     lowercase = tf.strings.lower(input_string)
-    return tf.strings.regex_replace(
-        lowercase, f"[{re.escape(strip_chars)}]", "")
+    return tf.strings.regex_replace(lowercase, f"[{re.escape(strip_chars)}]", "")
+
 
 vocab_size = 15000
 sequence_length = 20
@@ -90,18 +63,21 @@ target_vectorization.adapt(train_spanish_texts)
 
 # **Preparing datasets for the translation task**
 
-# In[ ]:
-
 
 batch_size = 64
+
 
 def format_dataset(eng, spa):
     eng = source_vectorization(eng)
     spa = target_vectorization(spa)
-    return ({
-        "english": eng,
-        "spanish": spa[:, :-1],
-    }, spa[:, 1:])
+    return (
+        {
+            "english": eng,
+            "spanish": spa[:, :-1],
+        },
+        spa[:, 1:],
+    )
+
 
 def make_dataset(pairs):
     eng_texts, spa_texts = zip(*pairs)
@@ -112,11 +88,9 @@ def make_dataset(pairs):
     dataset = dataset.map(format_dataset, num_parallel_calls=4)
     return dataset.shuffle(2048).prefetch(16).cache()
 
+
 train_ds = make_dataset(train_pairs)
 val_ds = make_dataset(val_pairs)
-
-
-# In[ ]:
 
 
 for inputs, targets in train_ds.take(1):
@@ -126,12 +100,7 @@ for inputs, targets in train_ds.take(1):
 
 
 # ### Sequence-to-sequence learning with RNNs
-
 # **GRU-based encoder**
-
-# In[ ]:
-
-
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -140,15 +109,10 @@ latent_dim = 1024
 
 source = keras.Input(shape=(None,), dtype="int64", name="english")
 x = layers.Embedding(vocab_size, embed_dim, mask_zero=True)(source)
-encoded_source = layers.Bidirectional(
-    layers.GRU(latent_dim), merge_mode="sum")(x)
+encoded_source = layers.Bidirectional(layers.GRU(latent_dim), merge_mode="sum")(x)
 
 
 # **GRU-based decoder and the end-to-end model**
-
-# In[ ]:
-
-
 past_target = keras.Input(shape=(None,), dtype="int64", name="spanish")
 x = layers.Embedding(vocab_size, embed_dim, mask_zero=True)(past_target)
 decoder_gru = layers.GRU(latent_dim, return_sequences=True)
@@ -159,26 +123,19 @@ seq2seq_rnn = keras.Model([source, past_target], target_next_step)
 
 
 # **Training our recurrent sequence-to-sequence model**
-
-# In[ ]:
-
-
 seq2seq_rnn.compile(
-    optimizer="rmsprop",
-    loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"])
+    optimizer="rmsprop", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+)
 seq2seq_rnn.fit(train_ds, epochs=15, validation_data=val_ds)
 
 
 # **Translating new sentences with our RNN encoder and decoder**
-
-# In[ ]:
-
-
 import numpy as np
+
 spa_vocab = target_vectorization.get_vocabulary()
 spa_index_lookup = dict(zip(range(len(spa_vocab)), spa_vocab))
 max_decoded_sentence_length = 20
+
 
 def decode_sequence(input_sentence):
     tokenized_input_sentence = source_vectorization([input_sentence])
@@ -186,13 +143,15 @@ def decode_sequence(input_sentence):
     for i in range(max_decoded_sentence_length):
         tokenized_target_sentence = target_vectorization([decoded_sentence])
         next_token_predictions = seq2seq_rnn.predict(
-            [tokenized_input_sentence, tokenized_target_sentence])
+            [tokenized_input_sentence, tokenized_target_sentence]
+        )
         sampled_token_index = np.argmax(next_token_predictions[0, i, :])
         sampled_token = spa_index_lookup[sampled_token_index]
         decoded_sentence += " " + sampled_token
         if sampled_token == "[end]":
             break
     return decoded_sentence
+
 
 test_eng_texts = [pair[0] for pair in test_pairs]
 for _ in range(20):
@@ -203,12 +162,8 @@ for _ in range(20):
 
 
 # ### Sequence-to-sequence learning with Transformer
-
 # #### The Transformer decoder
-
 # **The `TransformerDecoder`**
-
-# In[ ]:
 
 
 class TransformerDecoder(layers.Layer):
@@ -217,13 +172,13 @@ class TransformerDecoder(layers.Layer):
         self.embed_dim = embed_dim
         self.dense_dim = dense_dim
         self.num_heads = num_heads
-        self.attention_1 = layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=embed_dim)
-        self.attention_2 = layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=embed_dim)
+        self.attention_1 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
+        self.attention_2 = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim)
         self.dense_proj = keras.Sequential(
-            [layers.Dense(dense_dim, activation="relu"),
-             layers.Dense(embed_dim),]
+            [
+                layers.Dense(dense_dim, activation="relu"),
+                layers.Dense(embed_dim),
+            ]
         )
         self.layernorm_1 = layers.LayerNormalization()
         self.layernorm_2 = layers.LayerNormalization()
@@ -232,14 +187,17 @@ class TransformerDecoder(layers.Layer):
 
     def get_config(self):
         config = super().get_config()
-        config.update({
-            "embed_dim": self.embed_dim,
-            "num_heads": self.num_heads,
-            "dense_dim": self.dense_dim,
-        })
+        config.update(
+            {
+                "embed_dim": self.embed_dim,
+                "num_heads": self.num_heads,
+                "dense_dim": self.dense_dim,
+            }
+        )
         return config
 
-    def get_causal_attention_mask(self, inputs):
+    @staticmethod
+    def get_causal_attention_mask(inputs):
         input_shape = tf.shape(inputs)
         batch_size, sequence_length = input_shape[0], input_shape[1]
         i = tf.range(sequence_length)[:, tf.newaxis]
@@ -247,21 +205,18 @@ class TransformerDecoder(layers.Layer):
         mask = tf.cast(i >= j, dtype="int32")
         mask = tf.reshape(mask, (1, input_shape[1], input_shape[1]))
         mult = tf.concat(
-            [tf.expand_dims(batch_size, -1),
-             tf.constant([1, 1], dtype=tf.int32)], axis=0)
+            [tf.expand_dims(batch_size, -1), tf.constant([1, 1], dtype=tf.int32)], axis=0
+        )
         return tf.tile(mask, mult)
 
     def call(self, inputs, encoder_outputs, mask=None):
         causal_mask = self.get_causal_attention_mask(inputs)
         if mask is not None:
-            padding_mask = tf.cast(
-                mask[:, tf.newaxis, :], dtype="int32")
+            padding_mask = tf.cast(mask[:, tf.newaxis, :], dtype="int32")
             padding_mask = tf.minimum(padding_mask, causal_mask)
         attention_output_1 = self.attention_1(
-            query=inputs,
-            value=inputs,
-            key=inputs,
-            attention_mask=causal_mask)
+            query=inputs, value=inputs, key=inputs, attention_mask=causal_mask
+        )
         attention_output_1 = self.layernorm_1(inputs + attention_output_1)
         attention_output_2 = self.attention_2(
             query=attention_output_1,
@@ -269,26 +224,22 @@ class TransformerDecoder(layers.Layer):
             key=encoder_outputs,
             attention_mask=padding_mask,
         )
-        attention_output_2 = self.layernorm_2(
-            attention_output_1 + attention_output_2)
+        attention_output_2 = self.layernorm_2(attention_output_1 + attention_output_2)
         proj_output = self.dense_proj(attention_output_2)
         return self.layernorm_3(attention_output_2 + proj_output)
 
 
 # #### Putting it all together: A Transformer for machine translation
-
 # **PositionalEmbedding layer**
-
-# In[ ]:
 
 
 class PositionalEmbedding(layers.Layer):
     def __init__(self, sequence_length, input_dim, output_dim, **kwargs):
         super().__init__(**kwargs)
-        self.token_embeddings = layers.Embedding(
-            input_dim=input_dim, output_dim=output_dim)
+        self.token_embeddings = layers.Embedding(input_dim=input_dim, output_dim=output_dim)
         self.position_embeddings = layers.Embedding(
-            input_dim=sequence_length, output_dim=output_dim)
+            input_dim=sequence_length, output_dim=output_dim
+        )
         self.sequence_length = sequence_length
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -305,19 +256,17 @@ class PositionalEmbedding(layers.Layer):
 
     def get_config(self):
         config = super(PositionalEmbedding, self).get_config()
-        config.update({
-            "output_dim": self.output_dim,
-            "sequence_length": self.sequence_length,
-            "input_dim": self.input_dim,
-        })
+        config.update(
+            {
+                "output_dim": self.output_dim,
+                "sequence_length": self.sequence_length,
+                "input_dim": self.input_dim,
+            }
+        )
         return config
 
 
 # **End-to-end Transformer**
-
-# In[ ]:
-
-
 embed_dim = 256
 dense_dim = 2048
 num_heads = 8
@@ -335,41 +284,33 @@ transformer = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
 
 
 # **Training the sequence-to-sequence Transformer**
-
-# In[ ]:
-
-
 transformer.compile(
-    optimizer="rmsprop",
-    loss="sparse_categorical_crossentropy",
-    metrics=["accuracy"])
+    optimizer="rmsprop", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+)
 transformer.fit(train_ds, epochs=30, validation_data=val_ds)
 
 
 # **Translating new sentences with our Transformer model**
-
-# In[ ]:
-
-
 import numpy as np
+
 spa_vocab = target_vectorization.get_vocabulary()
 spa_index_lookup = dict(zip(range(len(spa_vocab)), spa_vocab))
 max_decoded_sentence_length = 20
+
 
 def decode_sequence(input_sentence):
     tokenized_input_sentence = source_vectorization([input_sentence])
     decoded_sentence = "[start]"
     for i in range(max_decoded_sentence_length):
-        tokenized_target_sentence = target_vectorization(
-            [decoded_sentence])[:, :-1]
-        predictions = transformer(
-            [tokenized_input_sentence, tokenized_target_sentence])
+        tokenized_target_sentence = target_vectorization([decoded_sentence])[:, :-1]
+        predictions = transformer([tokenized_input_sentence, tokenized_target_sentence])
         sampled_token_index = np.argmax(predictions[0, i, :])
         sampled_token = spa_index_lookup[sampled_token_index]
         decoded_sentence += " " + sampled_token
         if sampled_token == "[end]":
             break
     return decoded_sentence
+
 
 test_eng_texts = [pair[0] for pair in test_pairs]
 for _ in range(20):
