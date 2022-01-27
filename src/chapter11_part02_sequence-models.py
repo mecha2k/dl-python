@@ -1,16 +1,11 @@
 ### Processing words as a sequence: The sequence model approach
 #### A first practical example
 
-# get_ipython().system('curl -O https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz')
-# get_ipython().system('tar -xf aclImdb_v1.tar.gz')
-# get_ipython().system('rm -r aclImdb/train/unsup')
-
-
 import os, pathlib, shutil, random
 from tensorflow import keras
 
 batch_size = 32
-base_dir = pathlib.Path("aclImdb")
+base_dir = pathlib.Path("data/aclImdb")
 val_dir = base_dir / "val"
 train_dir = base_dir / "train"
 for category in ("neg", "pos"):
@@ -29,8 +24,6 @@ text_only_train_ds = train_ds.map(lambda x, y: x)
 
 
 # **Preparing integer sequence datasets**
-
-
 from tensorflow.keras import layers
 
 max_length = 600
@@ -48,8 +41,6 @@ int_test_ds = test_ds.map(lambda x, y: (text_vectorization(x), y), num_parallel_
 
 
 # **A sequence model built on one-hot encoded vector sequences**
-
-
 import tensorflow as tf
 
 inputs = keras.Input(shape=(None,), dtype="int64")
@@ -63,8 +54,6 @@ model.summary()
 
 
 # **Training a first basic sequence model**
-
-
 callbacks = [keras.callbacks.ModelCheckpoint("one_hot_bidir_lstm.keras", save_best_only=True)]
 model.fit(int_train_ds, validation_data=int_val_ds, epochs=10, callbacks=callbacks)
 model = keras.models.load_model("one_hot_bidir_lstm.keras")
@@ -72,18 +61,12 @@ print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 
 # #### Understanding word embeddings
-
 # #### Learning word embeddings with the Embedding layer
-
 # **Instantiating an `Embedding` layer**
-
-
 embedding_layer = layers.Embedding(input_dim=max_tokens, output_dim=256)
 
 
 # **Model that uses an `Embedding` layer trained from scratch**
-
-
 inputs = keras.Input(shape=(None,), dtype="int64")
 embedded = layers.Embedding(input_dim=max_tokens, output_dim=256)(inputs)
 x = layers.Bidirectional(layers.LSTM(32))(embedded)
@@ -100,10 +83,7 @@ print(f"Test acc: {model.evaluate(int_test_ds)[1]:.3f}")
 
 
 # #### Understanding padding and masking
-
 # **Using an `Embedding` layer with masking enabled**
-
-
 inputs = keras.Input(shape=(None,), dtype="int64")
 embedded = layers.Embedding(input_dim=max_tokens, output_dim=256, mask_zero=True)(inputs)
 x = layers.Bidirectional(layers.LSTM(32))(embedded)

@@ -119,12 +119,6 @@ print(decoded_sentence)
 
 # ## Two approaches for representing groups of words: Sets and sequences
 # ### Preparing the IMDB movie reviews data
-# get_ipython().system("curl -O https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz")
-# get_ipython().system("tar -xf aclImdb_v1.tar.gz")
-# get_ipython().system("rm -r aclImdb/train/unsup")
-# get_ipython().system("cat aclImdb/train/pos/4077_10.txt")
-
-
 import os, pathlib, shutil, random
 
 base_dir = pathlib.Path("data/aclImdb")

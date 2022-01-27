@@ -28,7 +28,7 @@ import tensorflow as tf
 from tensorflow import keras
 
 dataset = keras.utils.text_dataset_from_directory(
-    directory="aclImdb", label_mode=None, batch_size=256
+    directory="data/aclImdb", label_mode=None, batch_size=256
 )
 dataset = dataset.map(lambda x: tf.strings.regex_replace(x, "<br />", " "))
 
@@ -225,6 +225,3 @@ text_gen_callback = TextGenerator(
 
 # **Fitting the language model**
 model.fit(lm_dataset, epochs=200, callbacks=[text_gen_callback])
-
-
-# ### Wrapping up

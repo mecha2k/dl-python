@@ -86,8 +86,6 @@ class TransformerEncoder(layers.Layer):
 
 
 # **Using the Transformer encoder for text classification**
-
-
 vocab_size = 20000
 embed_dim = 256
 num_heads = 2
