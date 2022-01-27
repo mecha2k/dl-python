@@ -75,7 +75,7 @@ model.add(SimpleRNN(32))
 model.add(Dense(1, activation="sigmoid"))
 
 model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["acc"])
-history = model.fit(input_train, y_train, epochs=10, batch_size=128, validation_split=0.2)
+history = model.fit(input_train, y_train, epochs=1, batch_size=128, validation_split=0.2)
 
 
 # Let's display the training and validation loss and accuracy:
@@ -93,14 +93,14 @@ plt.plot(epochs, acc, "bo", label="Training acc")
 plt.plot(epochs, val_acc, "b", label="Validation acc")
 plt.title("Training and validation accuracy")
 plt.legend()
+plt.savefig("images/06-02-01")
 
 plt.figure()
 plt.plot(epochs, loss, "bo", label="Training loss")
 plt.plot(epochs, val_loss, "b", label="Validation loss")
 plt.title("Training and validation loss")
 plt.legend()
-plt.show()
-
+plt.savefig("images/06-02-02")
 
 # As a reminder, in chapter 3, our very first naive approach to this very dataset got us to 88% test accuracy.
 # Unfortunately, our small recurrent network doesn't perform very well at all compared to this baseline (only up to 85%
@@ -125,7 +125,7 @@ model.add(LSTM(32))
 model.add(Dense(1, activation="sigmoid"))
 
 model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["acc"])
-history = model.fit(input_train, y_train, epochs=10, batch_size=128, validation_split=0.2)
+history = model.fit(input_train, y_train, epochs=1, batch_size=128, validation_split=0.2)
 
 acc = history.history["acc"]
 val_acc = history.history["val_acc"]
@@ -133,15 +133,16 @@ loss = history.history["loss"]
 val_loss = history.history["val_loss"]
 
 epochs = range(len(acc))
-
+plt.figure()
 plt.plot(epochs, acc, "bo", label="Training acc")
 plt.plot(epochs, val_acc, "b", label="Validation acc")
 plt.title("Training and validation accuracy")
 plt.legend()
+plt.savefig("images/06-02-03")
 
 plt.figure()
 plt.plot(epochs, loss, "bo", label="Training loss")
 plt.plot(epochs, val_loss, "b", label="Validation loss")
 plt.title("Training and validation loss")
 plt.legend()
-plt.show()
+plt.savefig("images/06-02-04")
